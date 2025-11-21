@@ -1,55 +1,33 @@
-pipeline {
 
-    parameters {
-        booleanParam(name: 'autoApprove', defaultValue: false, 
-                     description: 'Automatically run apply after generating plan?')
-    }
+pipeline {
+    agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        AWS_ACCESS_KEY_ID = credentials('aws-access-key')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
     }
-
-    agent any
 
     stages {
 
         stage('Checkout Repo') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/surajdhakad007/terraform-jenkins-AWS-pipelineproject.git'
+                git branch: 'main', url: 'https://github.com/surajdhakad007/terraform-jenkins-AWS-pipelineproject.git'
             }
         }
 
         stage('Terraform Init & Plan') {
             steps {
                 sh '''
-                    cd terraform
-                    terraform init
-                    terraform plan -out=tfplan
+                terraform init
+                terraform plan -out=tfplan
                 '''
             }
         }
 
         stage('Approval') {
-            when {
-                not {
-                    equals expected: true, actual: params.autoApprove
-                }
-            }
             steps {
-                script {
-                    def planText = sh(
-                        script: "cd terraform && terraform show -no-color tfplan",
-                        returnStdout: true
-                    )
-
-                    input message: "Do you want to apply?",
-                          parameters: [
-                              text(name: 'Plan', 
-                                   description: 'Review Terraform Plan:', 
-                                   defaultValue: planText)
-                          ]
+                timeout(time: 10, unit: 'MINUTES') {
+                    input message: 'Do you want to apply changes?'
                 }
             }
         }
@@ -57,11 +35,9 @@ pipeline {
         stage('Apply') {
             steps {
                 sh '''
-                    cd terraform
-                    terraform apply -input=false tfplan
+                terraform apply -auto-approve tfplan
                 '''
             }
         }
     }
 }
-
